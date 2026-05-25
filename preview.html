@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JadwalSync — FEB Unpad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Playfair Display"', 'Georgia', 'serif'],
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-font-smoothing: antialiased; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #F1F5F9; }
+
+    @keyframes pulse-red { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .pulse-red { animation: pulse-red 2s ease-in-out infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .spin { animation: spin .8s linear infinite; }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    @keyframes slideUp { from{opacity:0;transform:translateY(16px) scale(.98)} to{opacity:1;transform:translateY(0) scale(1)} }
+    .fade-in { animation: fadeIn .18s ease-out forwards; }
+    .slide-up { animation: slideUp .24s cubic-bezier(.16,1,.3,1) forwards; }
+
+    /* Tab active underline */
+    .tab-btn { position:relative; padding-bottom:0; transition:color .15s; }
+    .tab-btn::after {
+      content:''; position:absolute; bottom:0; left:0; right:0; height:2px;
+      background:#F4A21C; border-radius:2px 2px 0 0;
+      transform:scaleX(0); transform-origin:center;
+      transition:transform .22s cubic-bezier(.16,1,.3,1);
+    }
+    .tab-btn.active::after { transform:scaleX(1); }
+
+    /* Matrix table */
+    .m-table { border-collapse:separate; border-spacing:0; width:100%; }
+    .m-table thead th {
+      font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.08em; color:#64748B;
+      padding:10px 16px; white-space:nowrap;
+      background:#F8FAFC; border-bottom:1px solid #E2E8F0;
+    }
+    .m-table tbody td { padding:0; vertical-align:top; }
+    .m-table tbody tr { border-bottom:1px solid #F1F5F9; }
+    .m-table tbody tr:last-child { border-bottom:none; }
+
+    /* Sticky first column */
+    .col-sticky { position:sticky; left:0; z-index:2; }
+    thead .col-sticky { z-index:4; }
+    tbody .col-sticky { background:white; }
+    tbody tr:hover .col-sticky { background:#FAFAFA; }
+    tbody tr:hover td { background:#FAFAFA; }
+
+    /* Class cell */
+    .cls-cell {
+      padding:14px 16px; min-width:210px;
+      border-left:1px solid #F1F5F9;
+      transition:background .12s;
+    }
+    .cls-cell-ontime  { border-top:2px solid #34D399; background:white; }
+    .cls-cell-online  { border-top:2px solid #60A5FA; background:rgba(239,246,255,.45); }
+    .cls-cell-cancelled { border-top:2px solid #DF1923; background:rgba(254,242,242,.7); }
+
+    /* Course name cell */
+    .course-cell {
+      padding:14px 18px; min-width:185px; max-width:220px;
+      border-right:1px solid #E2E8F0;
+    }
+
+    /* Buttons */
+    .btn-find:hover  { background:#C01520 !important; }
+    .btn-find:active { transform:scale(.97); }
+    .btn-approve:hover  { background:#D99010 !important; box-shadow:0 6px 20px rgba(244,162,28,.5) !important; }
+    .btn-approve:active { transform:scale(.98); }
+    .btn-zoom:hover  { background:#1d4ed8 !important; }
+
+    /* Modal */
+    .modal-backdrop { background:rgba(15,23,42,.45); backdrop-filter:blur(5px); }
+
+    /* Stat card */
+    .stat-card { transition:box-shadow .15s,transform .15s; }
+    .stat-card:hover { transform:translateY(-1px); box-shadow:0 4px 20px rgba(0,0,0,.08) !important; }
+
+    /* Slot row */
+    .slot-row { transition:border-color .12s,background .12s; }
+    .slot-row:hover { border-color:rgba(244,162,28,.35) !important; background:rgba(244,162,28,.04) !important; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width:5px; height:5px; }
+    ::-webkit-scrollbar-thumb { background:#CBD5E1; border-radius:3px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+<!-- ── HEADER ──────────────────────────────────────────────── -->
+<header class="bg-white border-b border-slate-200 sticky top-0 z-30"
+        style="box-shadow:0 1px 0 rgba(0,0,0,.04),0 2px 12px rgba(0,0,0,.04);">
+  <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
+
+    <!-- Wordmark -->
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background:#F4A21C;box-shadow:0 2px 8px rgba(244,162,28,.35);">
+        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M19 3h-1V1h-2v2H8V1H6v2H5C3.9 3 3 3.9 3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <h1 class="font-display font-bold text-slate-900 leading-none" style="font-size:16px;">JadwalSync</h1>
+          <span class="text-[10px] font-bold text-white px-1.5 py-0.5 rounded leading-none" style="background:#F4A21C;">BETA</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mt-0.5 leading-none">FEB · Universitas Padjadjaran</p>
+      </div>
+    </div>
+
+    <!-- Center label -->
+    <div class="hidden md:block text-center">
+      <p class="text-[11px] font-semibold text-slate-400 uppercase tracking-widest">Semester 4 · Ganjil 2025/2026</p>
+    </div>
+
+    <!-- Role + date -->
+    <div class="flex items-center gap-3 flex-shrink-0">
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-amber-200"
+           style="background:rgba(244,162,28,.08);">
+        <div class="w-6 h-6 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0">
+          <span class="text-[9px] font-bold text-white">PJ</span>
+        </div>
+        <div>
+          <p class="text-[12px] font-bold text-slate-800 leading-none">PJ Kelas</p>
+          <p class="text-[10px] text-amber-600 mt-0.5 leading-none font-semibold">Editor Access</p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="text-[12px] font-semibold text-slate-700 leading-none">Kamis, 15 Mei</p>
+        <p class="text-[10px] text-slate-400 mt-0.5 leading-none">2026</p>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── TAB BAR ─────────────────────────────────────────────── -->
+<div class="bg-white border-b border-slate-200 sticky z-20" style="top:61px;">
+  <div class="max-w-screen-xl mx-auto px-4 sm:px-6">
+    <div class="flex items-stretch gap-0" style="height:44px;">
+      <button id="tab-global" onclick="switchTab('global')"
+        class="tab-btn active flex items-center gap-2 px-5 text-[13px] font-semibold text-slate-800 hover:text-slate-900 hover:bg-slate-50 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
+        </svg>
+        Helicopter View
+      </button>
+      <button id="tab-personal" onclick="switchTab('personal')"
+        class="tab-btn flex items-center gap-2 px-5 text-[13px] font-semibold text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-colors">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        My Schedule
+        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded leading-none text-white bg-slate-400">Kelas A</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── GLOBAL / HELICOPTER VIEW ────────────────────────────── -->
+<div id="panel-global" class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+  <!-- Stats row -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="stat-card bg-white rounded-xl px-4 py-3.5 flex items-center gap-3 border border-slate-100"
+         style="box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);">
+      <div class="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+        </svg>
+      </div>
+      <div>
+        <p id="stat-total" class="text-[22px] font-bold text-slate-900 leading-none">15</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Total Sesi</p>
+      </div>
+    </div>
+    <div class="stat-card bg-white rounded-xl px-4 py-3.5 flex items-center gap-3 border border-slate-100"
+         style="box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);">
+      <div class="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center flex-shrink-0">
+        <div class="w-3 h-3 rounded-full bg-emerald-400"></div>
+      </div>
+      <div>
+        <p id="stat-ontime" class="text-[22px] font-bold text-emerald-600 leading-none">13</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">On Time</p>
+      </div>
+    </div>
+    <div class="stat-card bg-white rounded-xl px-4 py-3.5 flex items-center gap-3 border border-slate-100"
+         style="box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);">
+      <div class="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
+        <div class="w-3 h-3 rounded-full bg-blue-400"></div>
+      </div>
+      <div>
+        <p id="stat-online" class="text-[22px] font-bold text-blue-600 leading-none">1</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Online</p>
+      </div>
+    </div>
+    <div class="stat-card bg-white rounded-xl px-4 py-3.5 flex items-center gap-3"
+         style="box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);border:1px solid rgba(223,25,35,.12);">
+      <div class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+           style="background:rgba(223,25,35,.08);">
+        <div class="w-3 h-3 rounded-full pulse-red" style="background:#DF1923;"></div>
+      </div>
+      <div>
+        <p id="stat-cancelled" class="text-[22px] font-bold leading-none" style="color:#DF1923;">1</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">Cancelled</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Matrix card -->
+  <div class="bg-white rounded-2xl overflow-hidden"
+       style="box-shadow:0 1px 3px rgba(0,0,0,.06),0 6px 20px rgba(0,0,0,.05);border:1px solid #E2E8F0;">
+
+    <!-- Card header -->
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h2 class="font-display font-bold text-slate-900 text-[16px] leading-none">All Classes · Matrix View</h2>
+        <p class="text-[11px] text-slate-400 mt-1 leading-none">5 Mata Kuliah · 15 Sesi · Semester 4</p>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 flex-shrink-0"></span>On Time
+        </span>
+        <span class="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+          <span class="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0"></span>Online
+        </span>
+        <span class="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+          <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:#DF1923;"></span>Cancelled
+        </span>
+      </div>
+    </div>
+
+    <!-- Scrollable table -->
+    <div class="overflow-x-auto">
+      <table class="m-table">
+        <thead>
+          <tr>
+            <th class="col-sticky text-left" style="min-width:185px;padding-left:18px;">Mata Kuliah</th>
+            <th style="min-width:210px;text-align:left;">Kelas A</th>
+            <th style="min-width:210px;text-align:left;border-left:1px solid #E2E8F0;">Kelas B</th>
+            <th style="min-width:210px;text-align:left;border-left:1px solid #E2E8F0;">Kelas C</th>
+          </tr>
+        </thead>
+        <tbody id="matrixBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="flex items-center justify-between text-[11px] text-slate-400 px-1 pb-2">
+    <p>JadwalSync · FEB Unpad · © 2026</p>
+    <p class="hidden sm:block">Data diperbarui: Kamis, 15 Mei 2026</p>
+  </div>
+</div>
+
+<!-- ── MY SCHEDULE VIEW ─────────────────────────────────────── -->
+<div id="panel-personal" class="hidden max-w-2xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+  <div>
+    <p class="text-[11px] font-bold uppercase tracking-widest leading-none mb-1.5"
+       style="color:#F4A21C;letter-spacing:.15em;">Jadwal Saya</p>
+    <h2 class="font-display font-bold text-slate-900 leading-tight text-[20px]">Kelas A — Semester 4</h2>
+    <p class="text-[12px] text-slate-500 mt-1 leading-relaxed">Jadwal personal untuk mahasiswa Kelas A</p>
+  </div>
+  <div class="space-y-3" id="personalTimeline"></div>
+  <div class="flex items-center justify-between text-[11px] text-slate-400 pt-2">
+    <p>JadwalSync · FEB Unpad</p>
+    <p>© 2026</p>
+  </div>
+</div>
+
+<!-- ── MODAL: SMART RECOMMENDATION ─────────────────────────── -->
+<div id="recModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 modal-backdrop fade-in">
+  <div class="w-full max-w-md rounded-2xl overflow-hidden slide-up bg-white"
+       style="box-shadow:0 24px 64px rgba(0,0,0,.18),0 4px 16px rgba(0,0,0,.08);">
+
+    <!-- Modal header -->
+    <div class="px-5 py-4 flex items-center justify-between"
+         style="background:linear-gradient(135deg,#F4A21C 0%,#F8C040 100%);">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </div>
+        <div>
+          <p class="text-[14px] font-bold text-white leading-none">Smart Recommendation</p>
+          <p class="text-[11px] text-white/70 mt-0.5 leading-none">Slot pengganti tersedia</p>
+        </div>
+      </div>
+      <button onclick="closeModal()"
+        class="w-8 h-8 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+        style="color:rgba(255,255,255,.7);"
+        onmouseover="this.style.background='rgba(255,255,255,.18)';this.style.color='white'"
+        onmouseout="this.style.background='transparent';this.style.color='rgba(255,255,255,.7)'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Modal body -->
+    <div class="p-5 space-y-4">
+
+      <!-- Cancelled course info -->
+      <div class="flex items-center gap-3 p-3.5 rounded-xl"
+           style="background:rgba(223,25,35,.05);border:1px solid rgba(223,25,35,.12);">
+        <span class="text-[18px] leading-none flex-shrink-0">⚠</span>
+        <div class="min-w-0">
+          <p id="modalCourseName" class="text-[13px] font-bold leading-none truncate" style="color:#DF1923;">
+            Pengembangan Web — Kelas B
+          </p>
+          <p id="modalCourseTime" class="text-[11px] text-slate-500 mt-1 leading-none">
+            Senin, 13:30 – 16:00 · 0201-0715-0214
+          </p>
+        </div>
+      </div>
+
+      <!-- Divider with label -->
+      <div class="flex items-center gap-3">
+        <div class="flex-1 border-t border-dashed border-slate-200"></div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex-shrink-0">Slot Rekomendasi</p>
+        <div class="flex-1 border-t border-dashed border-slate-200"></div>
+      </div>
+
+      <!-- Slot 1 -->
+      <div class="slot-row flex items-start gap-3 rounded-xl p-3.5 border border-slate-100 cursor-default">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+             style="background:rgba(244,162,28,.15);">
+          <span class="text-[11px] font-bold leading-none" style="color:#F4A21C;">1</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[13px] font-semibold text-slate-900 leading-snug">Rabu, 13:30 – 16:00</p>
+          <p class="text-[11px] font-mono text-slate-400 mt-0.5">0201-0715-0313</p>
+          <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+            Tidak ada konflik jadwal Kelas B — ruangan kosong
+          </p>
+        </div>
+        <span class="flex-shrink-0 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full mt-0.5">
+          Tersedia
+        </span>
+      </div>
+
+      <!-- Slot 2 -->
+      <div class="slot-row flex items-start gap-3 rounded-xl p-3.5 border border-slate-100 cursor-default">
+        <div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+             style="background:rgba(244,162,28,.15);">
+          <span class="text-[11px] font-bold leading-none" style="color:#F4A21C;">2</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <p class="text-[13px] font-semibold text-slate-900 leading-snug">Kamis, 09:40 – 11:40</p>
+          <p class="text-[11px] font-mono text-slate-400 mt-0.5">0201-0718-0309</p>
+          <p class="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+            Sebelum slot Desain UI/UX — jadwal padat, perlu konfirmasi
+          </p>
+        </div>
+        <span class="flex-shrink-0 text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full mt-0.5">
+          Tersedia
+        </span>
+      </div>
+
+      <!-- Divider -->
+      <div class="border-t border-dashed border-slate-200"></div>
+
+      <!-- Approve button -->
+      <button id="approveBtn" onclick="handleApprove()"
+        class="w-full flex items-center justify-center gap-2 py-3.5 px-4 rounded-xl text-[14px] font-bold tracking-tight transition-all duration-200 btn-approve cursor-pointer"
+        style="background:#F4A21C;color:white;box-shadow:0 4px 14px rgba(244,162,28,.4);">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+        </svg>
+        Approve &amp; Notify Class
+      </button>
+
+      <p id="approveConfirm" class="hidden text-center text-[11px] text-emerald-600 font-semibold">
+        WhatsApp &amp; email telah dikirim ke seluruh anggota kelas.
+      </p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── DATA ────────────────────────────────────────────────────
+const courses = [
+  {
+    courseCode: 'B10E.5106',
+    courseName: 'Teknologi Finansial',
+    classes: [
+      { name:'A', time:'Senin, 07:30–10:00', room:'0201-0715-0213', status:'On Time' },
+      { name:'B', time:'Senin, 10:30–13:00', room:'0201-0715-0214', status:'On Time' },
+      { name:'C', time:'Senin, 13:30–16:00', room:'0201-0715-0215', status:'On Time' },
+    ]
+  },
+  {
+    courseCode: 'B10E.2108',
+    courseName: 'Pengembangan Web',
+    classes: [
+      { name:'A', time:'Senin, 07:30–10:00',  room:'0201-0715-0301', status:'On Time' },
+      { name:'B', time:'Senin, 13:30–16:00',  room:'0201-0715-0214', status:'Cancelled' },
+      { name:'C', time:'Selasa, 07:30–10:00', room:'0201-0715-0302', status:'On Time' },
+    ]
+  },
+  {
+    courseCode: 'B10E.4101',
+    courseName: 'Mengelola Organisasi Digital',
+    classes: [
+      { name:'A', time:'Selasa, 10:30–13:00', room:'0201-0715-0302', status:'Online' },
+      { name:'B', time:'Selasa, 13:30–16:00', room:'0201-0718-0308', status:'On Time' },
+      { name:'C', time:'Rabu, 07:30–10:00',   room:'0201-0713-0301', status:'On Time' },
+    ]
+  },
+  {
+    courseCode: 'B10E.4103',
+    courseName: 'Desain UI/UX',
+    classes: [
+      { name:'A', time:'Jumat, 09:40–11:40',  room:'0201-0718-0309', status:'On Time' },
+      { name:'B', time:'Kamis, 13:30–16:00',  room:'0201-0715-0311', status:'On Time' },
+      { name:'C', time:'Jumat, 13:30–16:00',  room:'0201-0718-0310', status:'On Time' },
+    ]
+  },
+  {
+    courseCode: 'B10E.3103',
+    courseName: 'Analitik Bisnis dan Maha Data',
+    classes: [
+      { name:'A', time:'Kamis, 07:30–10:00', room:'0201-0715-0213', status:'On Time' },
+      { name:'B', time:'Kamis, 13:30–16:00', room:'0201-0715-0311', status:'On Time' },
+      { name:'C', time:'Jumat, 07:30–10:00', room:'0201-0715-0312', status:'On Time' },
+    ]
+  }
+]
+
+// ── STATUS CONFIG ────────────────────────────────────────────
+const STATUS = {
+  'On Time':  { dot:'#34D399', cellClass:'cls-cell-ontime',   label:'On Time',  labelCss:'background:#ECFDF5;color:#059669;border:1px solid #A7F3D0;' },
+  'Online':   { dot:'#60A5FA', cellClass:'cls-cell-online',   label:'Online',   labelCss:'background:#EFF6FF;color:#2563EB;border:1px solid #BFDBFE;' },
+  'Cancelled':{ dot:'#DF1923', cellClass:'cls-cell-cancelled', label:'Cancelled',labelCss:'background:#FEF2F2;color:#DF1923;border:1px solid #FECACA;' },
+}
+
+function badge(status) {
+  const s = STATUS[status] || STATUS['On Time']
+  const pulse = status === 'Cancelled' ? ' pulse-red' : ''
+  return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:9999px;${s.labelCss}">
+    <span style="width:6px;height:6px;border-radius:50%;background:${s.dot};display:inline-block;" class="${pulse.trim()}"></span>
+    ${s.label}
+  </span>`
+}
+
+// ── RENDER MATRIX ─────────────────────────────────────────────
+function renderMatrix() {
+  const tbody = document.getElementById('matrixBody')
+  tbody.innerHTML = ''
+
+  courses.forEach((course, ci) => {
+    const tr = document.createElement('tr')
+
+    // Course name cell (sticky)
+    const tdName = document.createElement('td')
+    tdName.className = 'col-sticky'
+    tdName.style.cssText = 'border-right:1px solid #E2E8F0;background:white;'
+    tdName.innerHTML = `
+      <div class="course-cell">
+        <p style="font-size:13px;font-weight:700;color:#0F172A;line-height:1.3;">${course.courseName}</p>
+        <p style="font-size:10px;font-family:monospace;color:#94A3B8;margin-top:4px;">${course.courseCode}</p>
+      </div>`
+    tr.appendChild(tdName)
+
+    // Class cells
+    course.classes.forEach((cls, li) => {
+      const s = STATUS[cls.status] || STATUS['On Time']
+      const td = document.createElement('td')
+      td.style.borderLeft = '1px solid #F1F5F9'
+
+      const zoomBtn = cls.status === 'Online' ? `
+        <div style="margin-top:10px;">
+          <button class="btn-zoom" style="display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;background:#2563EB;color:white;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15);">
+            <svg style="width:12px;height:12px;" fill="currentColor" viewBox="0 0 24 24"><path d="M17 10.5V7a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1v-3.5l4 4v-11l-4 4z"/></svg>
+            Join Zoom
+          </button>
+        </div>` : ''
+
+      const findBtn = cls.status === 'Cancelled' ? `
+        <div style="margin-top:10px;">
+          <button class="btn-find"
+            onclick="openModal(${ci},${li})"
+            style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;background:#DF1923;color:white;padding:5px 10px;border-radius:8px;border:none;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.15);">
+            <svg style="width:12px;height:12px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            Find Slot
+          </button>
+        </div>` : ''
+
+      td.innerHTML = `
+        <div class="cls-cell ${s.cellClass}">
+          ${badge(cls.status)}
+          <p style="font-size:12px;font-weight:600;color:#334155;margin-top:8px;line-height:1.35;">${cls.time}</p>
+          <p style="font-size:11px;font-family:monospace;color:#94A3B8;margin-top:3px;">${cls.room}</p>
+          ${zoomBtn}
+          ${findBtn}
+        </div>`
+      tr.appendChild(td)
+    })
+
+    tbody.appendChild(tr)
+  })
+}
+
+// ── RENDER PERSONAL TIMELINE ──────────────────────────────────
+function renderPersonalTimeline() {
+  const dayOrder = ['Senin','Selasa','Rabu','Kamis','Jumat']
+  const scheduleA = courses.map(c => {
+    const cls = c.classes.find(cl => cl.name === 'A')
+    return { courseName: c.courseName, courseCode: c.courseCode, ...cls }
+  }).sort((a, b) => {
+    const da = dayOrder.findIndex(d => a.time.startsWith(d))
+    const db = dayOrder.findIndex(d => b.time.startsWith(d))
+    return da - db
+  })
+
+  const borderColors = { 'On Time':'#34D399', 'Online':'#60A5FA', 'Cancelled':'#DF1923' }
+
+  document.getElementById('personalTimeline').innerHTML = scheduleA.map(item => {
+    const bc = borderColors[item.status] || '#34D399'
+    const [day, hours] = item.time.split(', ')
+    return `
+      <div style="background:white;border-left:3px solid ${bc};border-radius:12px;padding:14px 16px;display:flex;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);">
+        <div style="flex-shrink:0;width:56px;">
+          <p style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;">${day || ''}</p>
+          <p style="font-size:12px;font-weight:700;color:#0F172A;margin-top:2px;line-height:1.3;">${hours || item.time}</p>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div>
+              <p style="font-size:13px;font-weight:700;color:#0F172A;line-height:1.3;">${item.courseName}</p>
+              <p style="font-size:11px;font-family:monospace;color:#94A3B8;margin-top:2px;">${item.room}</p>
+            </div>
+            ${badge(item.status)}
+          </div>
+        </div>
+      </div>`
+  }).join('')
+}
+
+// ── STATS ─────────────────────────────────────────────────────
+function computeStats() {
+  let total=0, onTime=0, online=0, cancelled=0
+  courses.forEach(c => c.classes.forEach(cl => {
+    total++
+    if (cl.status==='On Time') onTime++
+    else if (cl.status==='Online') online++
+    else if (cl.status==='Cancelled') cancelled++
+  }))
+  document.getElementById('stat-total').textContent = total
+  document.getElementById('stat-ontime').textContent = onTime
+  document.getElementById('stat-online').textContent = online
+  document.getElementById('stat-cancelled').textContent = cancelled
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function switchTab(name) {
+  const tabs = { global: 'tab-global', personal: 'tab-personal' }
+  const panels = { global: 'panel-global', personal: 'panel-personal' }
+  Object.keys(tabs).forEach(k => {
+    const tabEl = document.getElementById(tabs[k])
+    const panelEl = document.getElementById(panels[k])
+    if (k === name) {
+      tabEl.classList.add('active')
+      tabEl.style.color = '#1E293B'
+      panelEl.classList.remove('hidden')
+    } else {
+      tabEl.classList.remove('active')
+      tabEl.style.color = '#94A3B8'
+      panelEl.classList.add('hidden')
+    }
+  })
+}
+
+// ── MODAL ─────────────────────────────────────────────────────
+function openModal(ci, li) {
+  const course = courses[ci]
+  const cls = course.classes[li]
+  document.getElementById('modalCourseName').textContent = `${course.courseName} — Kelas ${cls.name}`
+  document.getElementById('modalCourseTime').textContent = `${cls.time} · ${cls.room}`
+  const modal = document.getElementById('recModal')
+  modal.style.display = 'flex'
+  modal.classList.remove('hidden')
+  resetApprove()
+}
+
+function closeModal() {
+  const modal = document.getElementById('recModal')
+  modal.style.display = ''
+  modal.classList.add('hidden')
+}
+
+document.getElementById('recModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal()
+})
+
+// ── APPROVE ───────────────────────────────────────────────────
+function handleApprove() {
+  const btn = document.getElementById('approveBtn')
+  if (btn.disabled) return
+  btn.disabled = true
+  btn.style.cssText = 'background:rgba(244,162,28,.55);color:white;box-shadow:none;cursor:wait;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:12px;font-size:14px;font-weight:700;border:none;'
+  btn.innerHTML = `
+    <svg class="spin" style="width:16px;height:16px;" fill="none" viewBox="0 0 24 24">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" style="opacity:.25"/>
+      <path fill="currentColor" style="opacity:.75" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+    </svg>
+    Mengirim notifikasi…`
+  setTimeout(() => {
+    btn.style.cssText = 'background:#10B981;color:white;box-shadow:0 4px 14px rgba(16,185,129,.35);cursor:default;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:12px;font-size:14px;font-weight:700;border:none;'
+    btn.innerHTML = `
+      <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+      </svg>
+      Notifikasi Terkirim ke Kelas!`
+    document.getElementById('approveConfirm').classList.remove('hidden')
+  }, 1800)
+}
+
+function resetApprove() {
+  const btn = document.getElementById('approveBtn')
+  if (!btn) return
+  btn.disabled = false
+  btn.style.cssText = 'background:#F4A21C;color:white;box-shadow:0 4px 14px rgba(244,162,28,.4);cursor:pointer;width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:12px;font-size:14px;font-weight:700;border:none;transition:all .2s;'
+  btn.innerHTML = `
+    <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+    </svg>
+    Approve &amp; Notify Class`
+  document.getElementById('approveConfirm').classList.add('hidden')
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+renderMatrix()
+renderPersonalTimeline()
+computeStats()
+</script>
+</body>
+</html>
